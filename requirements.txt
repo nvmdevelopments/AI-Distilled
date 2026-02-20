@@ -4,5 +4,6 @@ beautifulsoup4
 tenacity
 pandas
 streamlit
+altair<5.0.0
 youtube-transcript-api
 openai
