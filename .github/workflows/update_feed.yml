@@ -1,0 +1,45 @@
+name: Daily AI Feed Update
+
+on:
+  schedule:
+    # Runs at 11:00 UTC (6:00 AM EST) every day
+    - cron: '0 11 * * *'
+  # Allows you to manually trigger the workflow from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  update-feed:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to commit the updated database back to the repo
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Ingestion Pipeline (RSS & YouTube)
+        run: python ingestion.py
+
+      - name: Run Synthesis Pipeline (LLM & OpenAI TTS)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python synthesizer.py
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add articles.db podcast*.mp3
+          git commit -m "Auto-update AI feed and podcast [skip ci]" || echo "No changes to commit"
+          git push

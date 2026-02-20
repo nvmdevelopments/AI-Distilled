@@ -1,0 +1,8 @@
+feedparser
+requests
+beautifulsoup4
+tenacity
+pandas
+streamlit
+youtube-transcript-api
+openai

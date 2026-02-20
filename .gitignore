@@ -1,0 +1,18 @@
+# Environment Variables
+.env
+API key.env
+
+# Python specific ignores
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Streamlit specific
+.streamlit/secrets.toml
+
+# Logs
+*.log
+
+# We purposefully DO NOT ignore articles.db or podcast.wav/mp3 
+# because we want GitHub Actions to commit them daily to the repo.
