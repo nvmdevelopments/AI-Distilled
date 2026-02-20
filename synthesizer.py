@@ -93,7 +93,7 @@ def generate_podcast_script(client: genai.Client, raw_text: str) -> str:
         "The script should sound like a solo host talking directly to the listener in a natural, relaxed tone. "
         "Include natural conversational transitions (e.g., 'Now, shifting gears...', 'Interestingly...', 'Think about what this means...').\n"
         "CRITICAL: Do NOT include any speaker labels (like 'Host:' or 'Speaker 1:'), sound effect cues (like '[Intro music fades]'), or any text that isn't meant to be spoken out loud. Write ONLY the pure spoken text.\n"
-        "Start with an energetic welcome and dive straight into the top stories. Cover the macro trends, "
+        "Start with an energetic welcome framing this as the 'daily update' and dive straight into the top stories. Cover the macro trends, "
         "model updates, and actionable takeaways.\n\n"
         f"Raw Articles:\n{raw_text}"
     )
