@@ -135,8 +135,8 @@ def main():
             st.write(summary_row.get('whats_new_today', 'No data.'))
             st.divider()
             
-            st.header("2. Model and tooling updates")
-            st.write(summary_row.get('model_updates', 'No data.'))
+            st.header("2. The AI Daily Brief Summary")
+            st.write(summary_row.get('daily_brief_summary', 'No data.'))
             st.divider()
             
             st.header("3. Key Takeaways")
@@ -215,8 +215,8 @@ def main():
                     st.write(row.get('whats_new_today', 'No data.'))
                     st.divider()
                     
-                    st.subheader("2. Model and tooling updates")
-                    st.write(row.get('model_updates', 'No data.'))
+                    st.subheader("2. The AI Daily Brief Summary")
+                    st.write(row.get('daily_brief_summary', 'No data.'))
                     st.divider()
                     
                     st.subheader("3. Key Takeaways")

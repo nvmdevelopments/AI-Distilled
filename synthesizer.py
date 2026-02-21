@@ -23,7 +23,7 @@ load_dotenv("API key.env")
 
 class ExecutiveSummary(BaseModel):
     whats_new_today: str
-    model_updates: str
+    daily_brief_summary: str
     key_takeaways: str
 
 
@@ -34,7 +34,7 @@ def setup_database(cursor: sqlite3.Cursor):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             whats_new_today TEXT,
-            model_updates TEXT,
+            daily_brief_summary TEXT,
             key_takeaways TEXT,
             audio_path TEXT
         )
@@ -53,9 +53,9 @@ def generate_executive_report(client: genai.Client, raw_summaries: str) -> Execu
         "into a highly concise, executive-level report designed to be read in under 3 minutes.\n\n"
         "Please extract and construct the following three sections:\n"
         "1. What's new today: The most important general news and trends.\n"
-        "2. Model and tooling updates: Specific releases, updates, or benchmarks of AI models and developer tools.\n"
+        "2. The AI Daily Brief Summary: Find the text where the 'Source' is explicitly listed as 'The AI Daily Brief' and provide a comprehensive summary of that specific YouTube video transcript.\n"
         "   - CRITICAL: Limit this section to a MAXIMUM of 3 bullet points.\n"
-        "   - CRITICAL: For each bullet point in this section, you MUST include a sub-bullet titled 'So what does this mean in plain English:' that explains the impact and provides potential industry applications for the change.\n"
+        "   - CRITICAL: For each bullet point in this section, you MUST include a sub-bullet titled 'So what does this mean in plain English:' that explains the impact and provides potential industry applications.\n"
         "3. Key takeaways: Actionable insights for professionals.\n\n"
         "CRITICAL FORMATTING INSTRUCTION: You MUST format the content of EVERYTHING strictly as markdown bulleted lists. "
         "Do not use dense paragraphs whatsoever. Every single item must be a bullet point.\n\n"
@@ -139,7 +139,7 @@ def synthesis_job(db_path: str = "articles.db"):
         
         # 1. Fetch all processed raw articles that haven't been synthesized yet
         try:
-            cursor.execute("SELECT id, title, summary, raw_text FROM articles WHERE processed = 1 AND synthesized = 0")
+            cursor.execute("SELECT id, source, title, summary, raw_text FROM articles WHERE processed = 1 AND synthesized = 0")
             records = cursor.fetchall()
         except sqlite3.OperationalError:
             logger.error("Database table 'articles' does not exist.")
@@ -152,8 +152,8 @@ def synthesis_job(db_path: str = "articles.db"):
         logger.info(f"Synthesizing {len(records)} article summaries into an executive report...")
         
         # 2. Concatenate summaries for the text report, and raw text for the script
-        aggregated_summaries = "\n\n".join([f"Title: {row['title']}\nSummary: {row['summary']}" for row in records])
-        aggregated_raw_text = "\n\n".join([f"Title: {row['title']}\nContent: {row['raw_text']}" for row in records])
+        aggregated_summaries = "\n\n".join([f"Source: {row['source']}\nTitle: {row['title']}\nSummary: {row['summary']}" for row in records])
+        aggregated_raw_text = "\n\n".join([f"Source: {row['source']}\nTitle: {row['title']}\nContent: {row['raw_text']}" for row in records])
         
         if not aggregated_summaries.strip():
             logger.info("Aggregated text is empty. Skipping synthesis.")
@@ -177,10 +177,10 @@ def synthesis_job(db_path: str = "articles.db"):
             # 4. Save everything to database
             cursor.execute(
                 """
-                INSERT INTO executive_summaries (whats_new_today, model_updates, key_takeaways, audio_path)
+                INSERT INTO executive_summaries (whats_new_today, daily_brief_summary, key_takeaways, audio_path)
                 VALUES (?, ?, ?, ?)
                 """,
-                (report_data.whats_new_today, report_data.model_updates, report_data.key_takeaways, audio_file_path)
+                (report_data.whats_new_today, report_data.daily_brief_summary, report_data.key_takeaways, audio_file_path)
             )
             
             # Mark the summarized articles as synthesized
