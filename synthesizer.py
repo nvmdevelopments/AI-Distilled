@@ -54,11 +54,12 @@ def generate_executive_report(client: genai.Client, raw_summaries: str) -> Execu
         "Please extract and construct the following three sections:\n"
         "1. What's new today: The most important general news and trends.\n"
         "2. The AI Daily Brief Summary: Find the text where the 'Source' is explicitly listed as 'The AI Daily Brief' and provide a comprehensive summary of that specific YouTube video transcript.\n"
-        "   - CRITICAL: Limit this section to a MAXIMUM of 3 bullet points.\n"
-        "   - CRITICAL: For each bullet point in this section, you MUST include a sub-bullet titled 'So what does this mean in plain English:' that explains the impact and provides potential industry applications.\n"
+        "   - CRITICAL: You must categorize this summary by the different distinct topics discussed during the podcast episode.\n"
+        "   - CRITICAL: For each topic, create a main bullet point (e.g. '* **Topic Name:** Description').\n"
+        "   - CRITICAL: Directly underneath each topic bullet point, you MUST include an indented sub-bullet titled '* So what does this mean in plain English:' that explains the impact and provides potential industry applications.\n"
         "3. Key takeaways: Actionable insights for professionals.\n\n"
-        "CRITICAL FORMATTING INSTRUCTION: You MUST format the content of EVERYTHING strictly as markdown bulleted lists. "
-        "Do not use dense paragraphs whatsoever. Every single item must be a bullet point.\n\n"
+        "CRITICAL FORMATTING INSTRUCTION: You MUST format the content of EVERYTHING strictly as true markdown bulleted lists using asterisks (*).\n"
+        "You MUST include actual newline characters (\\n) between every single bullet point so they render correctly in the UI. Do NOT output a single paragraph with hyphens inside it. Every single item must be on its own line.\n\n"
         f"Raw Summaries Batch:\n{raw_summaries}"
     )
 
