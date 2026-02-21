@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import os
+import streamlit.components.v1 as components
 
 # Configuration
 DB_PATH = "articles.db"
@@ -48,11 +49,61 @@ def load_executive_summary():
         st.error(f"Error loading executive summary: {e}")
         return pd.DataFrame()
 
+@st.cache_data(ttl=60)
+def load_all_executive_summaries():
+    """Retrieve all historical executive summaries from the database."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        query = "SELECT * FROM executive_summaries ORDER BY generated_at DESC"
+        df = pd.read_sql_query(query, conn)
+        conn.close()
+        return df
+    except:
+        return pd.DataFrame()
+
+def display_countdown_timer():
+    """Injects a live Javascript timer counting down to the next 11:00 UTC."""
+    timer_html = """
+    <div style="font-family: sans-serif; text-align: center; padding: 12px; background-color: #1e1e24; color: #ffffff; border-radius: 8px; border: 1px solid #333333; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <span style="font-size: 1.1em; font-weight: 500;">Next Autonomous Update: </span>
+        <span id="countdown" style="font-family: monospace; font-size: 1.25em; font-weight: bold; color: #00ffcc;">Calculating...</span>
+    </div>
+    <script>
+        function updateTimer() {
+            const now = new Date();
+            let nextUpdate = new Date();
+            // Set to exactly 11:00:00 UTC
+            nextUpdate.setUTCHours(11, 0, 0, 0);
+            
+            // If it's already past 11:00 UTC today, the next update is tomorrow
+            if (now > nextUpdate) {
+                nextUpdate.setUTCDate(nextUpdate.getUTCDate() + 1);
+            }
+            
+            const diff = nextUpdate - now;
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+            
+            document.getElementById("countdown").innerText = 
+                hours.toString().padStart(2, '0') + "h " + 
+                minutes.toString().padStart(2, '0') + "m " + 
+                seconds.toString().padStart(2, '0') + "s";
+        }
+        setInterval(updateTimer, 1000);
+        updateTimer();
+    </script>
+    """
+    components.html(timer_html, height=80)
+
 
 def main():
     st.title("📰 AI Distillate News Feed")
     st.markdown("A highly synthesized executive overview of automated AI news.")
 
+    # Display Live Update Timer
+    display_countdown_timer()
+    
     # Load data
     df = load_data()
     exec_summary_df = load_executive_summary()
@@ -62,7 +113,7 @@ def main():
         return
 
     # Setup tabs
-    tab1, tab2 = st.tabs(["🚀 Executive Summary", "📋 Raw Source Feed"])
+    tab1, tab2, tab3 = st.tabs(["🚀 Executive Summary", "📋 Raw Source Feed", "🗄️ Archive"])
 
     # --- TAB 1: Executive Summary ---
     with tab1:
@@ -136,6 +187,40 @@ def main():
                      
                      st.markdown("---")
 
+    # --- TAB 3: Archive ---
+    with tab3:
+        st.header("Historical Archive")
+        st.markdown("Explore past editions of the AI Distillate feed.")
+        all_summaries_df = load_all_executive_summaries()
+        
+        if all_summaries_df.empty:
+            st.info("No historical data available yet.")
+        else:
+            # We skip the very first one since it's the current 'live' one shown in Tab 1
+            # But the user asked for an archive, so showing all of them or skipping the latest is an option.
+            # Let's show all of them.
+            for index, row in all_summaries_df.iterrows():
+                gen_date = row.get('generated_at', 'Unknown time')
+                
+                # Create an expander (clickable date) that reveals the content
+                with st.expander(f"📅 Daily Update: {gen_date}"):
+                    a_path = row.get('audio_path')
+                    if pd.notna(a_path) and isinstance(a_path, str):
+                        if os.path.exists(a_path):
+                            st.audio(a_path, format="audio/mp3")
+                        else:
+                            st.caption("(Audio file not found for this archive entry)")
+                    
+                    st.subheader("1. What's new today")
+                    st.write(row.get('whats_new_today', 'No data.'))
+                    st.divider()
+                    
+                    st.subheader("2. Model and tooling updates")
+                    st.write(row.get('model_updates', 'No data.'))
+                    st.divider()
+                    
+                    st.subheader("3. Key Takeaways")
+                    st.write(row.get('key_takeaways', 'No data.'))
 
 if __name__ == "__main__":
     main()
