@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 from tenacity import retry, stop_after_attempt, wait_exponential
 from typing import Dict
 from youtube_transcript_api import YouTubeTranscriptApi
+import youtube_transcript_api
 
 # Feeds configuration
 FEEDS = [
@@ -104,22 +105,32 @@ def process_feed(feed_config: Dict[str, str], conn: sqlite3.Connection) -> None:
 
     if feed_type == 'youtube':
          video_ids = get_latest_youtube_videos(feed_url)
+         video_ids.reverse() # Insert oldest first so highest rowid = newest
          for vid in video_ids:
              article_id = f"yt:{vid}"
              url = f"https://www.youtube.com/watch?v={vid}"
-             title = f"YouTube Video {vid}" # We don't easily get the title from the regex
+             
+             # Fetch the video page to extract the real title
+             try:
+                 video_html = fetch_url_content(url)
+                 title_match = re.search(r'<title>(.*?)</title>', video_html)
+                 title = title_match.group(1).replace(' - YouTube', '') if title_match else f"YouTube Video {vid}"
+             except Exception:
+                 title = f"YouTube Video {vid}"
              
              # Check if already exists
              cursor.execute("SELECT 1 FROM articles WHERE id = ?", (article_id,))
              if cursor.fetchone():
-                 print(f"  Skipping: '{url}' (Already exists)")
+                 print(f"  Skipping: '{title}' (Already exists)")
                  continue
                  
              try:
                  print(f"  Fetching transcript for: {url}")
-                 # Fixed: Call get_transcript directly on the class correctly imported
-                 transcript_list = YouTubeTranscriptApi.get_transcript(vid)
-                 raw_text = ' '.join([t['text'] for t in transcript_list])
+                 
+                 api = youtube_transcript_api.YouTubeTranscriptApi()
+                 transcript_list = api.list(vid)
+                 transcript = transcript_list.find_transcript(['en'])
+                 raw_text = ' '.join([t.text for t in transcript.fetch() if hasattr(t, 'text')])
                  
                  # Set summary to the first chunk of text if needed initially
                  summary = raw_text[:500] + "..." if len(raw_text) > 500 else raw_text
@@ -129,7 +140,7 @@ def process_feed(feed_config: Dict[str, str], conn: sqlite3.Connection) -> None:
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                  ''', (article_id, source_name, title, url, raw_text, summary, None, False))
                  conn.commit()
-                 print(f"  Saved: {url}")
+                 print(f"  Saved: {title}")
              except Exception as e:
                  print(f"  Error processing YouTube video '{vid}': {e}")
                  conn.rollback()
@@ -143,6 +154,8 @@ def process_feed(feed_config: Dict[str, str], conn: sqlite3.Connection) -> None:
             return
 
         entries = parsed_feed.entries[:5]
+        # Reverse to insert oldest first so the newest article gets the highest rowid
+        entries.reverse()
 
         for entry in entries:
             title = entry.get('title', 'No Title')

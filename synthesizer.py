@@ -140,21 +140,32 @@ def synthesis_job(db_path: str = "articles.db"):
         
         # 1. Fetch all processed raw articles that haven't been synthesized yet
         try:
-            cursor.execute("SELECT id, source, title, summary, raw_text FROM articles WHERE processed = 1 AND synthesized = 0")
-            records = cursor.fetchall()
+            cursor.execute("SELECT id, source, title, summary, raw_text FROM articles WHERE processed = 1 AND synthesized = 0 ORDER BY rowid DESC")
+            all_records = cursor.fetchall()
         except sqlite3.OperationalError:
             logger.error("Database table 'articles' does not exist.")
             return
             
-        if not records:
+        if not all_records:
             logger.info("No processed articles found to synthesize.")
             return
             
-        logger.info(f"Synthesizing {len(records)} article summaries into an executive report...")
+        # Filter to only include the *newest* AI Daily Brief and exclude older ones from this batch
+        llm_records = []
+        ai_brief_seen = False
+        for row in all_records:
+            if row['source'] == 'The AI Daily Brief':
+                if not ai_brief_seen:
+                    llm_records.append(row)
+                    ai_brief_seen = True
+            else:
+                llm_records.append(row)
+            
+        logger.info(f"Synthesizing {len(llm_records)} article summaries into an executive report...")
         
         # 2. Concatenate summaries for the text report, and raw text for the script
-        aggregated_summaries = "\n\n".join([f"Source: {row['source']}\nTitle: {row['title']}\nSummary: {row['summary']}" for row in records])
-        aggregated_raw_text = "\n\n".join([f"Source: {row['source']}\nTitle: {row['title']}\nContent: {row['raw_text']}" for row in records])
+        aggregated_summaries = "\n\n".join([f"Source: {row['source']}\nTitle: {row['title']}\nSummary: {row['summary']}" for row in llm_records])
+        aggregated_raw_text = "\n\n".join([f"Source: {row['source']}\nTitle: {row['title']}\nContent: {row['raw_text']}" for row in llm_records])
         
         if not aggregated_summaries.strip():
             logger.info("Aggregated text is empty. Skipping synthesis.")
@@ -184,8 +195,8 @@ def synthesis_job(db_path: str = "articles.db"):
                 (report_data.whats_new_today, report_data.daily_brief_summary, report_data.key_takeaways, audio_file_path)
             )
             
-            # Mark the summarized articles as synthesized
-            article_ids = [(row['id'],) for row in records]
+            # Mark ALL fetched articles (even older excluded ones) as synthesized
+            article_ids = [(row['id'],) for row in all_records]
             cursor.executemany("UPDATE articles SET synthesized = 1 WHERE id = ?", article_ids)
             
             conn.commit()
