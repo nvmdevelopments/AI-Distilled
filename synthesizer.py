@@ -28,11 +28,9 @@ class ExecutiveSummary(BaseModel):
 
 
 def setup_database(cursor: sqlite3.Cursor):
-    """Ensure the executive_summaries table exists with the new schema."""
-    # We drop the old table because the schema completely changed based on user request
-    cursor.execute("DROP TABLE IF EXISTS executive_summaries")
+    """Ensure the executive_summaries table exists with the proper schema."""
     cursor.execute("""
-        CREATE TABLE executive_summaries (
+        CREATE TABLE IF NOT EXISTS executive_summaries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             whats_new_today TEXT,
@@ -139,9 +137,9 @@ def synthesis_job(db_path: str = "articles.db"):
         
         setup_database(cursor)
         
-        # 1. Fetch all processed raw articles
+        # 1. Fetch all processed raw articles that haven't been synthesized yet
         try:
-            cursor.execute("SELECT title, summary, raw_text FROM articles WHERE processed = 1")
+            cursor.execute("SELECT id, title, summary, raw_text FROM articles WHERE processed = 1 AND synthesized = 0")
             records = cursor.fetchall()
         except sqlite3.OperationalError:
             logger.error("Database table 'articles' does not exist.")
@@ -184,6 +182,11 @@ def synthesis_job(db_path: str = "articles.db"):
                 """,
                 (report_data.whats_new_today, report_data.model_updates, report_data.key_takeaways, audio_file_path)
             )
+            
+            # Mark the summarized articles as synthesized
+            article_ids = [(row['id'],) for row in records]
+            cursor.executemany("UPDATE articles SET synthesized = 1 WHERE id = ?", article_ids)
+            
             conn.commit()
             logger.info("Successfully generated and saved new Executive Summary and Audio.")
             

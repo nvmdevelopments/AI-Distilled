@@ -30,6 +30,11 @@ jobs:
       - name: Run Ingestion Pipeline (RSS & YouTube)
         run: python ingestion.py
 
+      - name: Run Distillation Pipeline (LLM Categorization & Summary)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python distillation.py
+
       - name: Run Synthesis Pipeline (LLM & OpenAI TTS)
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

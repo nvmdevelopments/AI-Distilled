@@ -44,7 +44,8 @@ def setup_database() -> None:
             summary TEXT,
             industry_tag TEXT,
             audio_path TEXT,
-            processed BOOLEAN NOT NULL DEFAULT 0
+            processed BOOLEAN NOT NULL DEFAULT 0,
+            synthesized BOOLEAN NOT NULL DEFAULT 0
         )
     ''')
     conn.commit()
