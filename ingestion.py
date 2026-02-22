@@ -8,6 +8,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from typing import Dict
 from youtube_transcript_api import YouTubeTranscriptApi
 import youtube_transcript_api
+from datetime import datetime, timezone
 
 # Feeds configuration
 FEEDS = [
@@ -45,6 +46,7 @@ def setup_database() -> None:
             summary TEXT,
             industry_tag TEXT,
             audio_path TEXT,
+            published_at TEXT,
             processed BOOLEAN NOT NULL DEFAULT 0,
             synthesized BOOLEAN NOT NULL DEFAULT 0
         )
@@ -115,8 +117,11 @@ def process_feed(feed_config: Dict[str, str], conn: sqlite3.Connection) -> None:
                  video_html = fetch_url_content(url)
                  title_match = re.search(r'<title>(.*?)</title>', video_html)
                  title = title_match.group(1).replace(' - YouTube', '') if title_match else f"YouTube Video {vid}"
+                 pub_match = re.search(r'"publishDate":"([^"]+)"', video_html)
+                 published_at = pub_match.group(1) if pub_match else datetime.now(timezone.utc).isoformat()
              except Exception:
                  title = f"YouTube Video {vid}"
+                 published_at = datetime.now(timezone.utc).isoformat()
              
              # Check if already exists
              cursor.execute("SELECT 1 FROM articles WHERE id = ?", (article_id,))
@@ -136,9 +141,9 @@ def process_feed(feed_config: Dict[str, str], conn: sqlite3.Connection) -> None:
                  summary = raw_text[:500] + "..." if len(raw_text) > 500 else raw_text
                  
                  cursor.execute('''
-                     INSERT INTO articles (id, source, title, url, raw_text, summary, industry_tag, processed)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                 ''', (article_id, source_name, title, url, raw_text, summary, None, False))
+                     INSERT INTO articles (id, source, title, url, raw_text, summary, industry_tag, published_at, processed)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 ''', (article_id, source_name, title, url, raw_text, summary, None, published_at, False))
                  conn.commit()
                  print(f"  Saved: {title}")
              except Exception as e:
@@ -164,6 +169,15 @@ def process_feed(feed_config: Dict[str, str], conn: sqlite3.Connection) -> None:
             
             article_id = entry.get('id', url)
             
+            
+            published_at = datetime.now(timezone.utc).isoformat()
+            if 'published_parsed' in entry and entry.published_parsed:
+                t = entry.published_parsed
+                published_at = datetime(t[0], t[1], t[2], t[3], t[4], t[5], tzinfo=timezone.utc).isoformat()
+            elif 'updated_parsed' in entry and entry.updated_parsed:
+                t = entry.updated_parsed
+                published_at = datetime(t[0], t[1], t[2], t[3], t[4], t[5], tzinfo=timezone.utc).isoformat()
+                
             audio_path = None
             if 'enclosures' in entry:
                 for enc in entry.enclosures:
@@ -190,9 +204,9 @@ def process_feed(feed_config: Dict[str, str], conn: sqlite3.Connection) -> None:
 
             try:
                 cursor.execute('''
-                    INSERT INTO articles (id, source, title, url, raw_text, summary, industry_tag, audio_path, processed)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (article_id, source_name, title, url, raw_text, summary, None, audio_path, False))
+                    INSERT INTO articles (id, source, title, url, raw_text, summary, industry_tag, audio_path, published_at, processed)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (article_id, source_name, title, url, raw_text, summary, None, audio_path, published_at, False))
                 conn.commit()
                 print(f"  Saved: {title}")
             except Exception as e:

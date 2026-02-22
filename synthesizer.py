@@ -142,24 +142,28 @@ def synthesis_job(db_path: str = "articles.db"):
         try:
             cursor.execute("SELECT id, source, title, summary, raw_text FROM articles WHERE processed = 1 AND synthesized = 0 ORDER BY rowid DESC")
             all_records = cursor.fetchall()
+            
+            # Fetch the newest AI Daily Brief from the past 24 hours (even if synthesized=1)
+            cursor.execute("SELECT id, source, title, summary, raw_text FROM articles WHERE source = 'The AI Daily Brief' AND published_at >= datetime('now', '-24 hours') ORDER BY rowid DESC LIMIT 1")
+            ai_brief_record = cursor.fetchone()
         except sqlite3.OperationalError:
             logger.error("Database table 'articles' does not exist.")
             return
             
-        if not all_records:
+        if not all_records and not ai_brief_record:
             logger.info("No processed articles found to synthesize.")
             return
             
-        # Filter to only include the *newest* AI Daily Brief and exclude older ones from this batch
+        # Combine records: all unsynthesized non-AI-Daily-Brief ones, PLUS the single newest 24hr AI Daily Brief
         llm_records = []
-        ai_brief_seen = False
         for row in all_records:
-            if row['source'] == 'The AI Daily Brief':
-                if not ai_brief_seen:
-                    llm_records.append(row)
-                    ai_brief_seen = True
-            else:
+            if row['source'] != 'The AI Daily Brief':
                 llm_records.append(row)
+                
+        if ai_brief_record:
+            # Prevent duplicates if it happens to also be in all_records
+            if not any(r['id'] == ai_brief_record['id'] for r in llm_records):
+                llm_records.append(ai_brief_record)
             
         logger.info(f"Synthesizing {len(llm_records)} article summaries into an executive report...")
         
@@ -197,6 +201,9 @@ def synthesis_job(db_path: str = "articles.db"):
             
             # Mark ALL fetched articles (even older excluded ones) as synthesized
             article_ids = [(row['id'],) for row in all_records]
+            if ai_brief_record and ai_brief_record['id'] not in [row['id'] for row in all_records]:
+                 article_ids.append((ai_brief_record['id'],))
+                 
             cursor.executemany("UPDATE articles SET synthesized = 1 WHERE id = ?", article_ids)
             
             conn.commit()
