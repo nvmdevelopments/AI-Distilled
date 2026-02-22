@@ -123,11 +123,12 @@ def main():
             
             st.caption(f"Last Generated: {generated_at}")
             
-            # --- Audio Player ---
             audio_path = summary_row.get('audio_path')
             if pd.notna(audio_path) and isinstance(audio_path, str):
                 if os.path.exists(audio_path):
-                    st.audio(audio_path, format="audio/mp3")
+                    with open(audio_path, 'rb') as f:
+                        audio_bytes = f.read()
+                    st.audio(audio_bytes, format="audio/mp3")
                 else:
                     st.warning("Audio file not found on disk.")
             
@@ -183,7 +184,8 @@ def main():
                      audio_path = row.get('audio_path')
                      if pd.notna(audio_path) and isinstance(audio_path, str):
                          if os.path.exists(audio_path):
-                             st.audio(audio_path)
+                             with open(audio_path, 'rb') as f:
+                                 st.audio(f.read(), format="audio/mp3")
                      
                      st.markdown("---")
 
@@ -207,7 +209,8 @@ def main():
                     a_path = row.get('audio_path')
                     if pd.notna(a_path) and isinstance(a_path, str):
                         if os.path.exists(a_path):
-                            st.audio(a_path, format="audio/mp3")
+                            with open(a_path, 'rb') as f:
+                                st.audio(f.read(), format="audio/mp3")
                         else:
                             st.caption("(Audio file not found for this archive entry)")
                     
