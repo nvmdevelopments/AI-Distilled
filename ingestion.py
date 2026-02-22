@@ -6,9 +6,10 @@ import re
 from bs4 import BeautifulSoup
 from tenacity import retry, stop_after_attempt, wait_exponential
 from typing import Dict
-from youtube_transcript_api import YouTubeTranscriptApi
 import youtube_transcript_api
 from datetime import datetime, timezone
+from pydantic import BaseModel, HttpUrl, Field
+from typing import Optional
 
 # Feeds configuration
 FEEDS = [
@@ -32,6 +33,16 @@ FEEDS = [
 
 DB_NAME = "articles.db"
 
+class ArticleSchema(BaseModel):
+    id: str
+    source: str
+    title: str = Field(min_length=1)
+    url: HttpUrl
+    raw_text: str
+    summary: str
+    published_at: str # ISO Format
+    audio_path: Optional[str] = None
+    
 def setup_database() -> None:
     """Sets up the SQLite database and the required table."""
     conn = sqlite3.connect(DB_NAME)
@@ -140,10 +151,21 @@ def process_feed(feed_config: Dict[str, str], conn: sqlite3.Connection) -> None:
                  # Set summary to the first chunk of text if needed initially
                  summary = raw_text[:500] + "..." if len(raw_text) > 500 else raw_text
                  
+                 # Validate strictly with Pydantic
+                 validated_article = ArticleSchema(
+                     id=article_id,
+                     source=source_name,
+                     title=title,
+                     url=url,
+                     raw_text=raw_text,
+                     summary=summary,
+                     published_at=published_at
+                 )
+                 
                  cursor.execute('''
                      INSERT INTO articles (id, source, title, url, raw_text, summary, industry_tag, published_at, processed)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                 ''', (article_id, source_name, title, url, raw_text, summary, None, published_at, False))
+                 ''', (validated_article.id, validated_article.source, validated_article.title, str(validated_article.url), validated_article.raw_text, validated_article.summary, None, validated_article.published_at, False))
                  conn.commit()
                  print(f"  Saved: {title}")
              except Exception as e:
@@ -203,14 +225,26 @@ def process_feed(feed_config: Dict[str, str], conn: sqlite3.Connection) -> None:
                     print(f"  Failed to fetch content for {url}: {e}")
 
             try:
+                # Pydantic rigorous validation wrapper
+                validated_article = ArticleSchema(
+                    id=article_id,
+                    source=source_name,
+                    title=title,
+                    url=url,
+                    raw_text=raw_text,
+                    summary=summary,
+                    published_at=published_at,
+                    audio_path=audio_path
+                )
+                
                 cursor.execute('''
                     INSERT INTO articles (id, source, title, url, raw_text, summary, industry_tag, audio_path, published_at, processed)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (article_id, source_name, title, url, raw_text, summary, None, audio_path, published_at, False))
+                ''', (validated_article.id, validated_article.source, validated_article.title, str(validated_article.url), validated_article.raw_text, validated_article.summary, None, validated_article.audio_path, validated_article.published_at, False))
                 conn.commit()
                 print(f"  Saved: {title}")
             except Exception as e:
-                print(f"  Error saving '{title}': {e}")
+                print(f"  Error validating or saving '{title}': {e}")
                 conn.rollback()
 
 def main() -> None:
