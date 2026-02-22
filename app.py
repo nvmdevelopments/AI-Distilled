@@ -72,8 +72,8 @@ def display_countdown_timer():
         function updateTimer() {
             const now = new Date();
             let nextUpdate = new Date();
-            // Set to exactly 11:00:00 UTC
-            nextUpdate.setUTCHours(11, 0, 0, 0);
+            // Set to exactly 14:30:00 UTC
+            nextUpdate.setUTCHours(14, 30, 0, 0);
             
             // If it's already past 11:00 UTC today, the next update is tomorrow
             if (now > nextUpdate) {
